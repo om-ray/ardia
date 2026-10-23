@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { appendFileSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -501,6 +501,67 @@ try {
       await ac('ac.store.getState().reorderProfiles(["default","work"]); return true;');
     }
   });
+  const pull = (distance) => {
+    const steps = [{ phase: "began", dx: 0, dy: 0 }];
+    for (let left = distance; left > 0; left -= 12) steps.push({ phase: "changed", dx: -Math.min(12, left), dy: 0 });
+    steps.push({ phase: "ended", dx: 0, dy: 0 });
+    return steps.map((step, index) => ({ ...step, atMs: index * 16, timestampMs: index * 16 }));
+  };
+  async function onLastProfile() {
+    await ac('ac.store.getState().switchProfile("w1","work"); return true;');
+    await waitProfile("work");
+    await sleep(350);
+  }
+  const activationLog = () => { try { return readFileSync(join(data, "activation.log"), "utf8"); } catch { return ""; } };
+  await test("pulling the New Space page halfway in past the last profile makes a profile sharing its data and asks for its name", async () => {
+    await onLastProfile();
+    const logged = activationLog().length;
+    const result = await nativeBatch(pull(300));
+    const s = await ac('const s=ac.store.getState(); return { order:s.profileOrder, profiles:s.profiles, shown:s.windows.w1.profileId };');
+    const created = s.order[2];
+    try {
+      assert.equal(s.order.length, 3, "the pull should add a profile after the last one");
+      assert.equal(s.shown, created, "the window should page to the new profile");
+      assert.equal(s.profiles[created].dataId, "work", "the new profile shares the last profile's data");
+      assert.equal(s.profiles[created].name, "Profile 3");
+      assert.equal(new Set(s.order.map((id) => s.profiles[id].color)).size, 3, "the new profile takes an unused colour");
+      assert.equal(result.state.profileId, created);
+      assert.equal(result.state.selected, 2);
+      assert.equal(result.state.count, 3);
+      assert.equal(result.state.phase, "idle");
+      assert.ok(Math.abs(result.state.position - 2) < 0.003, "the slide should finish on the new profile");
+      let asked = "";
+      for (let start = Date.now(); Date.now() - start < 2000 && !asked; await sleep(50)) asked = activationLog().slice(logged);
+      assert.match(asked, /alert \(not shown\): sheet \| "Rename Profile" \| "" \| buttons Rename, Cancel/, "the rename sheet should open on the new profile");
+      return { result, created: s.profiles[created] };
+    } finally {
+      await ac(`ac.store.getState().switchProfile("w1","default"); ac.store.getState().deleteProfile(${JSON.stringify(created ?? "")}); return true;`);
+      await waitProfile("default");
+    }
+  });
+  await test("a flick short of half the New Space page springs back and makes nothing", async () => {
+    await onLastProfile();
+    const result = await nativeBatch(pull(120));
+    const ended = (result.result?.acks ?? []).find((a) => a.diag === "emit" && a.phase === "ended");
+    assert.ok(Math.abs(ended?.velocity ?? 0) >= 5, "the release should be a flick");
+    assert.deepEqual(await ac("return ac.store.getState().profileOrder;"), ["default", "work"]);
+    assert.equal(result.profile, "work");
+    assert.equal(result.state.selected, 1);
+    assert.equal(result.state.phase, "idle");
+    assert.ok(Math.abs(result.state.position - 1) < 0.003, "the pages should spring back to the last profile");
+    return result;
+  });
+  await test("a private window's sidebar has no New Space page", async () => {
+    const id = await ac('return ac.store.getState().createWindow({ incognito: true, background: true });');
+    try {
+      await sleep(500);
+      assert.equal(await ac(`return !!ac.store.getState().windows[${JSON.stringify(id)}]?.incognito;`), true);
+      assert.equal(await ac(`return !!globalThis.acSwipe.sidebar(${JSON.stringify(id)});`), false, "a private window's sidebar must not page");
+      return { id };
+    } finally {
+      await ac(`ac.store.getState().closeWindow(${JSON.stringify(id)}); return true;`);
+    }
+  });
   await test("removing the other profile keeps the remaining sidebar at its origin", async () => {
     await ac('ac.store.getState().switchProfile("w1","work"); return true;');
     await waitProfile("work");
@@ -514,6 +575,18 @@ try {
     assert.ok(Math.abs(result.position) < 0.003);
     assert.equal(result.phase, "idle");
     assert.ok(result.areas >= 1);
+    return result;
+  });
+  await test("the only profile's sidebar offers the New Space page too", async () => {
+    const result = await nativeBatch(pull(300));
+    const s = await ac('const s=ac.store.getState(); return { order:s.profileOrder, profiles:s.profiles, shown:s.windows.w1.profileId };');
+    assert.equal(s.order.length, 2, "the pull should add a second profile");
+    assert.equal(s.shown, s.order[1]);
+    assert.equal(s.profiles[s.order[1]].dataId, "work");
+    assert.equal(result.state.selected, 1);
+    assert.equal(result.state.count, 2);
+    assert.equal(result.state.phase, "idle");
+    assert.ok(Math.abs(result.state.position - 1) < 0.003, "the slide should finish on the new profile");
     return result;
   });
   stage = "the snapshot";
