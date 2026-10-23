@@ -635,18 +635,21 @@ try {
     return { scroll, back };
   });
   await test("the only profile's sidebar offers the New Space page too", async () => {
-    const result = await nativeBatch(pull(300));
-    const s = await ac('const s=ac.store.getState(); return { order:s.profileOrder, profiles:s.profiles, shown:s.windows.w1.profileId };');
-    assert.equal(s.order.length, 2, "the pull should add a second profile");
-    assert.equal(s.shown, s.order[1]);
-    assert.equal(s.profiles[s.order[1]].dataId, "work");
-    assert.equal(result.state.selected, 1);
-    assert.equal(result.state.count, 2);
-    assert.equal(result.state.phase, "idle");
-    assert.ok(Math.abs(result.state.position - 1) < 0.003, "the slide should finish on the new profile");
-    await waitSettingsOn(s.order[1]);
-    await closeSettings();
-    return result;
+    try {
+      const result = await nativeBatch(pull(300));
+      const s = await ac('const s=ac.store.getState(); return { order:s.profileOrder, profiles:s.profiles, shown:s.windows.w1.profileId };');
+      assert.equal(s.order.length, 2, "the pull should add a second profile");
+      assert.equal(s.shown, s.order[1]);
+      assert.equal(s.profiles[s.order[1]].dataId, "work");
+      assert.equal(result.state.selected, 1);
+      assert.equal(result.state.count, 2);
+      assert.equal(result.state.phase, "idle");
+      assert.ok(Math.abs(result.state.position - 1) < 0.003, "the slide should finish on the new profile");
+      await waitSettingsOn(s.order[1]);
+      return result;
+    } finally {
+      await closeSettings();
+    }
   });
   stage = "the snapshot";
   evidence.snapshot = { path: join(data, "profile-swipe.png"),
