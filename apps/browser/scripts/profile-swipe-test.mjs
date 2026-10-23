@@ -558,6 +558,36 @@ try {
     assert.ok(Math.abs(result.state.position - 1) < 0.003, "the pages should spring back to the last profile");
     return result;
   });
+  await test("switching profiles during the slide onto a new profile drops its editor, even after paging back to it", async () => {
+    await onLastProfile();
+    const first = await ac(`
+      const store = ac.store;
+      const unsubscribe = store.subscribe((s, prev) => {
+        if (s.profileOrder.length <= prev.profileOrder.length) return;
+        unsubscribe();
+        queueMicrotask(() => store.getState().switchProfile("w1", "work"));
+      });
+      return globalThis.acSwipe.sidebar("w1").devSimulate(${JSON.stringify(pull(300))}, {ignorePreference:true})
+        .then(() => new Promise((resolve) => setTimeout(resolve, 900)))
+        .then(() => ac.shell.windowIds())
+        .then((ids) => ({ order: store.getState().profileOrder, shown: store.getState().windows.w1.profileId, settings: ids.includes("settings") }));
+    `);
+    const created = first.order[2];
+    try {
+      assert.equal(first.order.length, 3, "the pull should still make the profile");
+      assert.equal(first.shown, "work", "the switch during the slide should win");
+      assert.equal(first.settings, false, "no editor after switching away mid-slide");
+      const back = await nativeBatch(gesture(-1));
+      assert.equal(back.profile, created, "a swipe should page to the new profile");
+      await sleep(500);
+      assert.equal((await settingsShown()).open, false, "paging back later must not open the editor");
+      return { first, back: back.state };
+    } finally {
+      await closeSettings();
+      await ac(`ac.store.getState().switchProfile("w1","default"); ac.store.getState().deleteProfile(${JSON.stringify(created ?? "")}); return true;`);
+      await waitProfile("default");
+    }
+  });
   await test("a private window's sidebar has no New Space page", async () => {
     const id = await ac('return ac.store.getState().createWindow({ incognito: true, background: true });');
     try {

@@ -38,6 +38,7 @@ class ProfilePager {
     this.unsubscribe = useBrowser.subscribe((s, prev) => {
       const w = s.windows[windowId];
       if (!w) return this.dispose();
+      if (this.created && w.profileId !== this.created) this.created = null;
       const was = prev.windows[windowId];
       if (w.profileId !== was?.profileId || w.incognito !== was?.incognito || s.profileOrder !== prev.profileOrder) {
         this.state.setState({ pages: this.warmPages() });
@@ -61,8 +62,7 @@ class ProfilePager {
   private editCreatedProfile() {
     const id = this.created;
     this.created = null;
-    const s = useBrowser.getState();
-    if (id && s.profiles[id] && s.windows[this.windowId]?.profileId === id) openSettings("profiles", id);
+    if (id) openSettings("profiles", id);
   }
 
   private selectExternal(profileId: string, order: string[]) {
