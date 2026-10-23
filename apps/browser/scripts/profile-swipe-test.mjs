@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { appendFileSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -512,10 +512,18 @@ try {
     await waitProfile("work");
     await sleep(350);
   }
-  const activationLog = () => { try { return readFileSync(join(data, "activation.log"), "utf8"); } catch { return ""; } };
-  await test("pulling the New Space page halfway in past the last profile makes a profile sharing its data and asks for its name", async () => {
+  const settingsShown = () => ac('return ac.shell.windowIds().then((ids) => ({ open: ids.includes("settings"), ...ac.settingsNav.getState() }));');
+  async function waitSettingsOn(profileId) {
+    let shown;
+    for (let start = Date.now(); Date.now() - start < 2000; await sleep(50)) {
+      shown = await settingsShown();
+      if (shown.open && shown.pane === "profiles" && shown.profileId === profileId) return shown;
+    }
+    assert.fail(`Settings should open on the new profile's editor, got ${JSON.stringify({ open: shown.open, pane: shown.pane, profileId: shown.profileId })}`);
+  }
+  const closeSettings = () => ac('return ac.shell.closeWindow("settings").then(() => true);');
+  await test("pulling the New Space page halfway in past the last profile makes a profile sharing its data and opens its editor", async () => {
     await onLastProfile();
-    const logged = activationLog().length;
     const result = await nativeBatch(pull(300));
     const s = await ac('const s=ac.store.getState(); return { order:s.profileOrder, profiles:s.profiles, shown:s.windows.w1.profileId };');
     const created = s.order[2];
@@ -530,11 +538,10 @@ try {
       assert.equal(result.state.count, 3);
       assert.equal(result.state.phase, "idle");
       assert.ok(Math.abs(result.state.position - 2) < 0.003, "the slide should finish on the new profile");
-      let asked = "";
-      for (let start = Date.now(); Date.now() - start < 2000 && !asked; await sleep(50)) asked = activationLog().slice(logged);
-      assert.match(asked, /alert \(not shown\): sheet \| "Rename Profile" \| "" \| buttons Rename, Cancel/, "the rename sheet should open on the new profile");
-      return { result, created: s.profiles[created] };
+      const editor = await waitSettingsOn(created);
+      return { result, created: s.profiles[created], editor: { pane: editor.pane, profileId: editor.profileId } };
     } finally {
+      await closeSettings();
       await ac(`ac.store.getState().switchProfile("w1","default"); ac.store.getState().deleteProfile(${JSON.stringify(created ?? "")}); return true;`);
       await waitProfile("default");
     }
@@ -587,6 +594,8 @@ try {
     assert.equal(result.state.count, 2);
     assert.equal(result.state.phase, "idle");
     assert.ok(Math.abs(result.state.position - 1) < 0.003, "the slide should finish on the new profile");
+    await waitSettingsOn(s.order[1]);
+    await closeSettings();
     return result;
   });
   stage = "the snapshot";

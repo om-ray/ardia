@@ -1,10 +1,10 @@
 import { pagerState, selectPager, stepPager, switchPager, type NativePagerConfig, type PagerStateEvent, type SwipeEvent } from "@ardia/ardiacore";
-import { prompt } from "@ardia/shell";
 import { useEffect, useMemo } from "react";
 import { Animated, unstable_batchedUpdates } from "react-native";
 import { create } from "zustand";
 import { useShallow } from "zustand/react/shallow";
 import { useBrowser } from "../../store/browser";
+import { openSettings } from "../settings/windows";
 
 export type PagerPage = { id: string; slot: number; resting?: boolean };
 
@@ -30,7 +30,7 @@ class ProfilePager {
   private wheelState = { sum: 0, last: 0, trigger: 0 };
   private external = 0;
   private externalGeneration = 0;
-  private unnamed: string | null = null;
+  private created: string | null = null;
 
   constructor(readonly windowId: string) {
     this.pos = new Animated.Value(Math.max(0, this.index()), { useNativeDriver: true });
@@ -55,18 +55,14 @@ class ProfilePager {
     if (event.phase !== "selected") this.state.setState({ fromLast: event.phase === "began" && this.onLastProfile() });
     if (this.external) return;
     this.commitNative(pagerState(this.windowId) ?? event, event);
-    if (event.phase === "settled") this.askNewProfileName();
+    if (event.phase === "settled") this.editCreatedProfile();
   };
 
-  private askNewProfileName() {
-    const id = this.unnamed;
-    this.unnamed = null;
+  private editCreatedProfile() {
+    const id = this.created;
+    this.created = null;
     const s = useBrowser.getState();
-    const profile = id ? s.profiles[id] : undefined;
-    if (!id || !profile || s.windows[this.windowId]?.profileId !== id) return;
-    void prompt({ title: "Rename Profile", value: profile.name, placeholder: "Profile name", confirmTitle: "Rename", windowId: this.windowId }).then(
-      (name) => name && useBrowser.getState().updateProfile(id, { name }),
-    );
+    if (id && s.profiles[id] && s.windows[this.windowId]?.profileId === id) openSettings("profiles", id);
   }
 
   private selectExternal(profileId: string, order: string[]) {
@@ -94,7 +90,7 @@ class ProfilePager {
         this.switching = true;
         try {
           const target = newPage ? s.createProfile({ name: "", shareWith: w.profileId }) : id!;
-          if (newPage) this.unnamed = target;
+          if (newPage) this.created = target;
           s.switchProfile(this.windowId, target);
         } finally {
           this.switching = false;
