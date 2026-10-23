@@ -584,6 +584,17 @@ try {
     assert.ok(result.areas >= 1);
     return result;
   });
+  await test("the only profile's sidebar still scrolls and ignores a back swipe", async () => {
+    const scroll = await simulate([{ phase: "began", dy: 5 }, { phase: "changed", dy: 16 }, { phase: "changed", dy: 20 }, { phase: "ended" }]);
+    assert.ok(scroll.events.every((e) => !e.swallowed), "vertical events must reach the scroll view");
+    const back = await nativeBatch(pull(300).map((step) => ({ ...step, dx: -step.dx })));
+    assert.ok(back.result.events.every((e) => !e.swallowed), "a back swipe on the only profile must not be tracked");
+    assert.deepEqual(await ac("return ac.store.getState().profileOrder;"), ["work"]);
+    assert.equal(back.state.selected, 0);
+    assert.equal(back.state.phase, "idle");
+    assert.ok(Math.abs(back.state.position) < 0.003, "the sidebar should not move");
+    return { scroll, back };
+  });
   await test("the only profile's sidebar offers the New Space page too", async () => {
     const result = await nativeBatch(pull(300));
     const s = await ac('const s=ac.store.getState(); return { order:s.profileOrder, profiles:s.profiles, shown:s.windows.w1.profileId };');

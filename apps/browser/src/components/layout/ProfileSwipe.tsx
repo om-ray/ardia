@@ -59,8 +59,8 @@ export function ProfileSwipeArea({ surface, style, pageWidth }: { surface: "side
       ref={area}
       style={style}
       canSwipeBack={previous}
-      canSwipeForward={next}
-      tracksUnavailableDirections={multiple || offersNewPage}
+      canSwipeForward={next || offersNewPage}
+      tracksUnavailableDirections={multiple}
       isPager={multiple || offersNewPage}
       offersNewPage={offersNewPage}
       onSwipe={onSwipe}
