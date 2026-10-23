@@ -558,6 +558,15 @@ try {
     assert.ok(Math.abs(result.state.position - 1) < 0.003, "the pages should spring back to the last profile");
     return result;
   });
+  await test("a discrete swipe past the last profile passes through and makes nothing", async () => {
+    await onLastProfile();
+    const result = await simulate([{ phase: "swipe", dx: -3 }]);
+    await sleep(400);
+    assert.equal(result.events?.[0]?.swallowed, false, "a discrete forward swipe on the last profile must reach the responder chain, as before");
+    assert.deepEqual(await ac("return ac.store.getState().profileOrder;"), ["default", "work"]);
+    assert.equal(await profile(), "work");
+    return result.events;
+  });
   await test("switching profiles during the slide onto a new profile drops its editor, even after paging back to it", async () => {
     await onLastProfile();
     const first = await ac(`
