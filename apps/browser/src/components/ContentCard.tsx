@@ -23,8 +23,9 @@ import { removeTabs } from "../store/tabs";
 import { splitOf } from "../store/splits";
 import type { SplitView, Tab } from "../store/types";
 import { BOOKMARKS_BAR_HEIGHT, BookmarksBar, bookmarksBarShown, useBookmarksBarMode, type BookmarksBarMode } from "./bookmarks/BookmarksBar";
-import { CliControlBar, CliControlPill } from "./CliControlBar";
+import { CliControlPill } from "./CliControlPill";
 import { FindBar } from "./FindBar";
+import { statusBubblePlacement } from "./layout/cliPillLayout";
 import { POPOVER_MARGIN } from "./layout/controls";
 import { NO_TOOLBAR, splitGeometry, toolbarGeometry, type Rect, type ToolbarGeometry } from "./layout/geometry";
 import { dismissPermissions, startPermissionPrompts } from "./site/permissions";
@@ -352,6 +353,9 @@ const TabPane = memo(function TabPane({
     if (visible) revealToolbar(tabId);
   }, [visible]);
   const chromeInWindow = hideBar && windowToolbar;
+  const cliPill = visible && !covered && (fullscreen || focused || !inSplit);
+  const [cliPillWidth, setCliPillWidth] = useState(0);
+  const bubble = statusBubblePlacement(frame.width, cliPill ? cliPillWidth : 0);
   useLayoutEffect(() => {
     if (chromeInWindow) publishPaneChrome(windowId, { tabId, mode, bar: motion.bar, fade: motion.fade });
   });
@@ -382,7 +386,6 @@ const TabPane = memo(function TabPane({
       <Animated.View style={autoLayout ? motion.groupStyle : { flex: 1 }}>
         {autoLayout && bookmarksBar && <BookmarksBar placeholder={!visible} />}
         <View style={autoLayout ? { height: motion.pageHeight } : { flex: 1 }}>
-          {visible && !fullscreen && (focused || !inSplit) && <CliControlBar />}
           {visible && !fullscreen && <ShareBar tabId={tabId} />}
           <View style={{ flex: 1 }}>
             {(mounted || prewarmed) && <TabWebView tabId={tabId} visible={visible && !newTabShown && !isNewTab} warm={!!warm && !newTabShown && !isNewTab} />}
@@ -391,10 +394,14 @@ const TabPane = memo(function TabPane({
             {visible && (
               <>
                 <FindBar tabId={tabId} />
-                {fullscreen && <CliControlPill />}
                 <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, autoLayout && motion.bottomStyle]}>
-                  <StatusBubble tabId={tabId} maxWidth={Math.max(160, frame.width / 2)} />
+                  <StatusBubble tabId={tabId} maxWidth={bubble.maxWidth} bottom={bubble.bottom} />
                 </Animated.View>
+                {cliPill && (
+                  <Animated.View pointerEvents="box-none" style={[StyleSheet.absoluteFill, autoLayout && motion.bottomStyle]}>
+                    <CliControlPill onWidth={setCliPillWidth} />
+                  </Animated.View>
+                )}
                 <SadTab tabId={tabId} />
                 {!newTabShown && <PermissionPrompt tabId={tabId} left={Math.max(POPOVER_MARGIN, Math.min(geometry.urlLeft, frame.width - 308))} top={POPOVER_MARGIN} />}
                 <PasswordPrompt tabId={tabId} right={POPOVER_MARGIN} top={POPOVER_MARGIN} />

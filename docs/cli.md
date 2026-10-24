@@ -193,6 +193,14 @@ formats, tracebacks included. pydoll's loggers stay at ERROR. The stream holds b
 registered token and releases everything on `flush()`, at exit and on SIGTERM or SIGHUP (exit 143). A token printed in
 two parts with an explicit flush between them gets through; that gap is accepted.
 
+While the CLI has a connection open, Ardia shows a pill floating over the page at the bottom centre of the focused
+tab card (12 pt up, once per window, in split view and page full screen too): a terminal glyph, "ardia is controlling
+Ardia" and Stop, which turns the setting off (`CliControlPill.tsx`). It never moves or resizes the page. It shows at
+once on the first connection and stays 3 s after the last one closes, so a burst of `ardia exec` calls shows it once
+and hides it once (`lib/cliDisclosure.ts`); turning the setting off hides it at once. Only the pill takes clicks.
+While it's up, the link status bubble ends before it (or sits above it in a narrow pane), and the split-view toast
+and the Bookmarks undo toast sit above it (`layout/cliPillLayout.ts`).
+
 ## Install and upgrade
 
 `install.sh [--version V] [--sha256 DIGEST] [--uninstall]` (run with `/bin/sh`; `--help`):

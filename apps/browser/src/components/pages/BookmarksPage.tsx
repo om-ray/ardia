@@ -15,6 +15,8 @@ import { Button, useFormColors } from "../settings/controls";
 import { openImport } from "../settings/windows";
 import { DropTargets } from "./dropTargets";
 import { EmptyState, hostLabel, matchesQuery, PageHeader } from "./PageLayout";
+import { useCliDisclosed } from "../CliControlPill";
+import { CLI_PILL_CLEARANCE } from "../layout/cliPillLayout";
 
 const ROW = 36;
 
@@ -390,8 +392,9 @@ function BookmarkRow({
 
 function UndoToast({ message, onUndo }: { message: string; onUndo: () => void }) {
   const theme = useTheme();
+  const cliShown = useCliDisclosed();
   return (
-    <View pointerEvents="box-none" style={{ position: "absolute", left: 0, right: 0, bottom: 24, alignItems: "center" }}>
+    <View pointerEvents="box-none" style={{ position: "absolute", left: 0, right: 0, bottom: cliShown ? CLI_PILL_CLEARANCE : 24, alignItems: "center" }}>
       <View
         style={{
           flexDirection: "row",
