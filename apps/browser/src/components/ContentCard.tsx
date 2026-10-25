@@ -541,6 +541,7 @@ const TabWebView = memo(function TabWebView({ tabId, visible, warm }: { tabId: s
       }}
       onLoadError={() => {
         pending.current = null;
+        revealToolbar(tabId);
       }}
       onDownloadNavigation={({ committedUrl, skipped }) => {
         pending.current = null;
