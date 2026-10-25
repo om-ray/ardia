@@ -923,6 +923,11 @@
       rebase(y) {
         anchor = last = y;
       },
+      start(y) {
+        anchor = last = y;
+        sent = y <= 2 ? "top" : null;
+        return sent;
+      },
       scrolled(y, range, viewport, now, user) {
         resized(viewport, now);
         if (now - lastAt > GESTURE) {
@@ -954,6 +959,7 @@
     };
   };
   const direction = scrollDirection();
+  if (direction.start(scrollY)) send("scroll", { state: "top" });
   let scroller = null;
   let scrollTarget = null;
   let inputAt = -1e9;

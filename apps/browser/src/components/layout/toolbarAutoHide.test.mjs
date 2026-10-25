@@ -61,6 +61,28 @@ test("the top of the page reports top", () => {
   assert.deepEqual(p.sent, ["down", "up", "top"]);
 });
 
+test("a new document at the top shows the bar the last one hid (a reload, the same address)", () => {
+  useBrowser.getState().hydrate({});
+  const w = useBrowser.getState().createWindow({ url: "https://a.com" });
+  const tabId = useBrowser.getState().newTab(w, { url: "https://example.com" });
+  const p = page();
+  for (let y = 20; y <= 400; y += 20) p.to(y);
+  noteScroll(tabId, { state: p.sent.at(-1) });
+  assert.equal(useToolbarAutoHide.getState().scrolledDown[tabId], true);
+  const next = scrollDirection();
+  noteScroll(tabId, { state: next.start(0) });
+  assert.equal(useToolbarAutoHide.getState().scrolledDown[tabId], undefined);
+  assert.equal(next.scrolled(0, 2000, 800, 2000, false), null);
+  let now = 3000;
+  const sent = [];
+  for (let y = 10; y <= 200; y += 10) {
+    const state = next.scrolled(y, 2000, 800, (now += 16), true);
+    if (state) sent.push(state);
+  }
+  assert.deepEqual(sent, ["down"]);
+  useBrowser.getState().closeTab(tabId);
+});
+
 test("a page with little to scroll never hides the bar", () => {
   const p = page({ range: 100 });
   for (let y = 5; y <= 100; y += 5) p.to(y);
