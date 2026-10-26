@@ -109,13 +109,16 @@ function loadPage(tabId, { scrollY = 0 } = {}) {
     now += 500;
   };
   const overlay = () => {
-    const el = { scrollTop: 0, scrollHeight: 4000, clientHeight: 800, clientWidth: 1200 };
+    const el = { scrollTop: 0, scrollHeight: 4000, clientHeight: 800, clientWidth: 1200, isConnected: true, visible: true, left: 0 };
     el.contains = (n) => n === el || n?.parent === el;
+    el.checkVisibility = () => el.visible;
+    el.getBoundingClientRect = () => ({ left: el.left, top: 0, right: el.left + el.clientWidth, bottom: el.clientHeight });
     return el;
   };
   const resized = () => observers.forEach((o) => o.watched.size && o.fn([]));
   const nextFrame = () => frames.splice(0).forEach((fn) => fn());
-  return { doc, document: env.document, fire, scroll, overlay, resized, nextFrame };
+  const tick = (ms) => (now += ms);
+  return { doc, document: env.document, fire, scroll, overlay, resized, nextFrame, tick };
 }
 
 function hiddenTab() {
@@ -162,6 +165,52 @@ test("wheeling up or pressing Home at the page's top shows the bar, not inside a
   page.fire("keydown", { key: "ArrowDown" });
   assert.ok(hidden(tabId));
   page.fire("keydown", { key: "Home" });
+  assert.ok(!hidden(tabId));
+  useBrowser.getState().closeTab(tabId);
+});
+
+test("an overlay closed without changing size (hidden, transparent, slid out) gives the bar back at the page's top", () => {
+  for (const close of [(el) => (el.visible = false), (el) => (el.left = 1200)]) {
+    const tabId = hiddenTab();
+    const page = loadPage(tabId);
+    const dialog = page.overlay();
+    page.scroll(dialog, 1500);
+    assert.ok(hidden(tabId));
+    close(dialog);
+    page.fire("keydown", { key: "Home" });
+    assert.ok(!hidden(tabId));
+    const again = page.overlay();
+    page.scroll(again, 1500);
+    assert.ok(hidden(tabId));
+    close(again);
+    page.fire("click", { target: page.doc });
+    page.nextFrame();
+    assert.ok(!hidden(tabId));
+    useBrowser.getState().closeTab(tabId);
+  }
+});
+
+test("two full-window scrollers moving together (synced panes) still hide and show the bar", () => {
+  const tabId = hiddenTab();
+  const page = loadPage(tabId);
+  const pane = page.overlay();
+  const both = (to) => {
+    const from = page.doc.scrollTop;
+    for (let i = 1; i <= 20; i++) {
+      page.fire("wheel", { deltaY: Math.sign(to - from), target: page.doc });
+      page.doc.scrollTop = from + ((to - from) * i) / 20;
+      page.fire("scroll", { target: page.document });
+      page.nextFrame();
+      page.tick(8);
+      pane.scrollTop = page.doc.scrollTop;
+      page.fire("scroll", { target: pane });
+      page.nextFrame();
+      page.tick(8);
+    }
+  };
+  both(1500);
+  assert.ok(hidden(tabId));
+  both(1200);
   assert.ok(!hidden(tabId));
   useBrowser.getState().closeTab(tabId);
 });

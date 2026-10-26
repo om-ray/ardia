@@ -118,7 +118,7 @@ the app as a person would rather than writing a new helper:
 | `devMenuCommand(command, arg)` | Fires a menu command as if picked from the menu bar |
 | `ArdiaApp.devMenuItems(title, path?)` | A menu bar menu's items as AppKit has them, its own included (Window › Fill, Move & Resize…); `"tiling:<windowId>"` is the window's green-button menu and whether AppKit tiles it; `path` picks an item |
 | `ArdiaApp.devPostKey(windowId, key, keyCode, modifiers)` | Posts one key press to the app's event queue (`"menu:<key>"`: straight to the menu bar's key equivalents). System hot keys (fn-⌃ tiling) can't be posted |
-| `devSnapshotWindow(windowId, path, transparent?)` | Writes the window's layers to a PNG in-process (works with the screen locked; `false` = failed) |
+| `devSnapshotWindow(windowId, path, transparent?)` | Writes the window's layers to a PNG in-process (works with the screen locked; `false` = failed). Pages draw in the GPU process, so they come out as their view's bare background; for the page's pixels, `ArdiaCEF.devWindow(n, "pagePictures:1")` first lays Chrome's own picture of each shown page over it in the window (test instances; `"pagePictures"` lists them once taken, with their frame in the window, top-left points; `"pagePictures:0"` removes them; they go by themselves after 4 s) |
 | `devRenderIntroMusic(cues, path)` | Renders the onboarding intro music to an audio file, for a video's soundtrack |
 
 ## Hover never moves anything

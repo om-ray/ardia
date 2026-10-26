@@ -1817,6 +1817,38 @@ NSDictionary *ProbeFrame(NSWindow *window, ACWindowFullScreen *state, CFTimeInte
     NSData *json = [NSJSONSerialization dataWithJSONObject:state options:0 error:nil];
     return json ? [[NSString alloc] initWithData:json encoding:NSUTF8StringEncoding] : @"{}";
   }
+  if ([action hasPrefix:@"pagePictures"]) {
+    static NSMutableArray<ACPageCover *> *pictures;
+    if (!ardiacore_host::Background()) return @"test instances only";
+    if ([action isEqualToString:@"pagePictures"]) {
+      NSView *content = window.contentView;
+      NSMutableArray *shown = [NSMutableArray array];
+      for (ACPageCover *cover in pictures) {
+        if (cover.window != window) continue;
+        const NSRect r = [cover convertRect:cover.bounds toView:content];
+        CGImageRef picture = (__bridge CGImageRef)cover.layer.contents;
+        [shown addObject:@{
+          @"frame" : @[ @(NSMinX(r)), @(content.isFlipped ? NSMinY(r) : content.bounds.size.height - NSMaxY(r)), @(NSWidth(r)), @(NSHeight(r)) ],
+          @"picture" : picture ? @[ @(CGImageGetWidth(picture)), @(CGImageGetHeight(picture)) ] : @[],
+        }];
+      }
+      NSData *json = [NSJSONSerialization dataWithJSONObject:shown options:0 error:nil];
+      return json ? [[NSString alloc] initWithData:json encoding:NSUTF8StringEncoding] : @"[]";
+    }
+    for (ACPageCover *cover in pictures) [cover uncover:NO];
+    pictures = [NSMutableArray array];
+    if (![action isEqualToString:@"pagePictures:1"]) return @"0";
+    ArdiaCoreWindow *coreWindow = [ArdiaCoreWindowController forNSWindow:window].coreWindow;
+    if (!coreWindow.activeProfile) return @"not an ArdiaCore window";
+    NSMutableArray<ArdiaCoreTab *> *tabs = [NSMutableArray array];
+    for (ArdiaCoreTab *tab in [coreWindow tabsForProfile:coreWindow.activeProfile]) {
+      ArdiaCoreWebView *view = [ArdiaCoreTabs viewForTab:tab];
+      if (tab.view.window == window && !tab.view.isHiddenOrHasHiddenAncestor && view && view.alphaValue >= 0.5) [tabs addObject:tab];
+    }
+    NSMutableArray<ACPageCover *> *taking = pictures;
+    [ACPageCover coverTabs:tabs then:^(NSArray<ACPageCover *> *covers) { [taking addObjectsFromArray:covers]; }];
+    return @(tabs.count).stringValue;
+  }
   NSView *frameView = window.contentView.superview;
   if ([action isEqualToString:@"children"]) {
     NSMutableArray *children = [NSMutableArray array];
