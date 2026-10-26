@@ -9,9 +9,10 @@ export type ToolbarMode = "shown" | "collapsed" | "peek";
 type Store = {
   scrolledDown: Record<string, true>;
   peek: Record<string, true>;
+  documents: Record<string, number>;
 };
 
-export const useToolbarAutoHide = create<Store>()(() => ({ scrolledDown: {}, peek: {} }));
+export const useToolbarAutoHide = create<Store>()(() => ({ scrolledDown: {}, peek: {}, documents: {} }));
 
 const without = (map: Record<string, true>, tabId: string) => {
   if (!map[tabId]) return map;
@@ -37,6 +38,14 @@ export function revealToolbar(tabId: string) {
     const peek = without(s.peek, tabId);
     return scrolledDown === s.scrolledDown && peek === s.peek ? s : { scrolledDown, peek };
   });
+}
+
+export function noteDocument(tabId: string) {
+  useToolbarAutoHide.setState((s) => ({ documents: { ...s.documents, [tabId]: (s.documents[tabId] ?? 0) + 1 } }));
+}
+
+export function documentKey(url: string, documents: number | undefined): string {
+  return documents !== undefined && /^(https?|file):/i.test(url) ? `document ${documents}` : url.replace(/#.*$/, "");
 }
 
 export function setToolbarPeek(tabId: string, on: boolean) {
@@ -65,17 +74,20 @@ export function needsBar(s: BrowserState, tabId: string, windowId: string): bool
 
 useBrowser.subscribe((s, prev) => {
   if (s.tabs === prev.tabs) return;
-  const { scrolledDown, peek } = useToolbarAutoHide.getState();
+  const { scrolledDown, peek, documents } = useToolbarAutoHide.getState();
   const gone: string[] = [];
   for (const id in scrolledDown) if (!s.tabs[id]) gone.push(id);
   for (const id in peek) if (!s.tabs[id]) gone.push(id);
+  for (const id in documents) if (!s.tabs[id]) gone.push(id);
   if (!gone.length) return;
   useToolbarAutoHide.setState((st) => {
     let { scrolledDown: d, peek: p } = st;
+    const documentsLeft = { ...st.documents };
     for (const id of gone) {
       d = without(d, id);
       p = without(p, id);
+      delete documentsLeft[id];
     }
-    return { scrolledDown: d, peek: p };
+    return { scrolledDown: d, peek: p, documents: documentsLeft };
   });
 });

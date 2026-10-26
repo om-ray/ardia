@@ -992,10 +992,15 @@
     requestAnimationFrame(leaveHiddenScroller);
   };
   const scrollerGone = new ResizeObserver(leaveHiddenScroller);
+  const scrollerHidden = new MutationObserver(recheckScroller);
   const follow = (el) => {
     scrollerGone.disconnect();
+    scrollerHidden.disconnect();
     scroller = el;
-    if (el !== docScroller()) scrollerGone.observe(el);
+    if (el !== docScroller()) {
+      scrollerGone.observe(el);
+      scrollerHidden.observe(document.documentElement, { attributes: true, childList: true, subtree: true });
+    }
     direction.rebase(el.scrollTop);
   };
   const UP_KEYS = new Set(["ArrowUp", "PageUp", "Home"]);
@@ -1013,7 +1018,7 @@
   });
   for (const type of ["wheel", "keydown", "mousedown", "touchstart"]) addEventListener(type, noteInput, { passive: true, capture: true });
   addEventListener("mousemove", (e) => e.buttons && noteInput(e), { passive: true, capture: true });
-  for (const type of ["click", "transitionend"]) addEventListener(type, recheckScroller, { passive: true, capture: true });
+  for (const type of ["click", "transitionend", "animationend"]) addEventListener(type, recheckScroller, { passive: true, capture: true });
   const measureScroll = guard(() => {
     const targets = [...scrollTargets];
     scrollTargets.clear();

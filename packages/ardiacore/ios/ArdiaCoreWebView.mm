@@ -1885,6 +1885,7 @@ void ArdiaCoreWebViewsSetFieldTiming(BOOL on) {
     if (main) [self resetPageMedia];
     if (main && ![(Text(dict, @"url", 8192) ?: @"about:") hasPrefix:@"about:"]) _requestedURL = nil;
     AnswerHello(tab, _profile, dict, frameId, main);
+    if (main) [self emit:@"pageMessage" payload:@{@"kind" : @"document", @"data" : NSNull.null}];
   } else if ([kind isEqualToString:@"selection"] && main) {
     [self emit:@"pageMessage" payload:@{@"kind" : @"selection", @"data" : SelectionState(dict) ?: NSNull.null}];
   } else if ([kind isEqualToString:@"linkDrop"] && main) {
@@ -2671,11 +2672,19 @@ bool CommandScrollZooms(NSEvent *event, bool trackpad) {
     NSString *phase = step[@"phase"];
     BOOL wheel = [phase isEqualToString:@"wheel"];
     int32_t dy = (int32_t)[step[@"dy"] intValue];
+    if (step[@"x"] && step[@"y"]) {
+      inWindow = [view convertPoint:NSMakePoint(NSMinX(b) + [step[@"x"] doubleValue], view.isFlipped ? NSMinY(b) + [step[@"y"] doubleValue] : NSMaxY(b) - [step[@"y"] doubleValue]) toView:nil];
+      screen = [window convertPointToScreen:inWindow];
+    }
     CGEventRef cg = CGEventCreateScrollWheelEvent2(NULL, wheel ? kCGScrollEventUnitLine : kCGScrollEventUnitPixel, 1, dy, 0, 0);
-    CGEventSetFlags(cg, kCGEventFlagMaskCommand);
+    CGEventSetFlags(cg, [step[@"plain"] boolValue] ? 0 : kCGEventFlagMaskCommand);
     CGEventSetIntegerValueField(cg, kCGScrollWheelEventIsContinuous, !wheel);
     if (!wheel) CGEventSetDoubleValueField(cg, kCGScrollWheelEventFixedPtDeltaAxis1, dy);
-    if ([phase isEqualToString:@"momentum"]) CGEventSetIntegerValueField(cg, kCGScrollWheelEventMomentumPhase, kCGMomentumScrollPhaseContinue);
+    if ([phase hasPrefix:@"momentum"])
+      CGEventSetIntegerValueField(cg, kCGScrollWheelEventMomentumPhase,
+                                  [phase isEqualToString:@"momentumBegan"]   ? kCGMomentumScrollPhaseBegin
+                                  : [phase isEqualToString:@"momentumEnded"] ? kCGMomentumScrollPhaseEnd
+                                                                             : kCGMomentumScrollPhaseContinue);
     else if (!wheel)
       CGEventSetIntegerValueField(cg, kCGScrollWheelEventScrollPhase,
                                   [phase isEqualToString:@"mayBegin"] ? kCGScrollPhaseMayBegin

@@ -56,7 +56,7 @@ import { setNowPlaying, setPictureInPictureState } from "./media/state";
 import { Toolbar, ToolbarBackdrop, urlFieldRight } from "./Toolbar";
 import { AutoHideBackdrop, AutoHideToolbar, useToolbarMode, useToolbarMotion } from "./AutoHideToolbar";
 import { publishPaneChrome, WindowToolbar } from "./WindowToolbar";
-import { noteScroll, revealToolbar } from "./layout/toolbarAutoHide";
+import { documentKey, noteDocument, noteScroll, revealToolbar, useToolbarAutoHide } from "./layout/toolbarAutoHide";
 import { NavigationOverlays } from "./layout/SwipeOverlay";
 import "./layout/devExpose";
 import { closeWebNotification, showWebNotification } from "../lib/webNotifications";
@@ -345,7 +345,8 @@ const TabPane = memo(function TabPane({
   const hideBar = autoHide && visible && !fullscreen;
   const mode = useToolbarMode(tabId, windowId, hideBar);
   const bookmarksBar = bookmarksBarShown(barMode, own.exists ? own : undefined) && !fullscreen && !inSplit && !small;
-  const doc = pageKey(own.url);
+  const documents = useToolbarAutoHide((s) => s.documents[tabId]);
+  const doc = documentKey(own.url, documents);
   const autoLayout = autoHide && toolbar && !fullscreen;
   const motion = useToolbarMotion({ enabled: autoLayout, mode, height: frame.height, extra: bookmarksBar ? BOOKMARKS_BAR_HEIGHT : 0, doc });
   useEffect(() => {
@@ -608,6 +609,7 @@ const TabWebView = memo(function TabWebView({ tabId, visible, warm }: { tabId: s
       onPageMessage={(kind, data) => {
         if (kind === "selection") setPageSelection(tabId, data as PageSelection | null);
         else if (kind === "scroll") noteScroll(tabId, data);
+        else if (kind === "document") noteDocument(tabId);
       }}
       onNotificationClose={closeWebNotification}
       onDiscarded={(url) => {

@@ -1827,9 +1827,26 @@ NSDictionary *ProbeFrame(NSWindow *window, ACWindowFullScreen *state, CFTimeInte
         if (cover.window != window) continue;
         const NSRect r = [cover convertRect:cover.bounds toView:content];
         CGImageRef picture = (__bridge CGImageRef)cover.layer.contents;
+        CALayer *root = content.layer;
+        NSArray * (^placed)(CALayer *) = ^NSArray *(CALayer *layer) {
+          const CGRect l = [layer convertRect:layer.bounds toLayer:root];
+          return @[ @(CGRectGetMinX(l)), @(root.geometryFlipped ? CGRectGetMinY(l) : root.bounds.size.height - CGRectGetMaxY(l)), @(CGRectGetWidth(l)), @(CGRectGetHeight(l)) ];
+        };
+        NSMutableArray *engineLayers = [NSMutableArray array];
+        NSMutableArray<CALayer *> *walk = [NSMutableArray array];
+        for (NSView *sub in cover.superview.subviews)
+          if (sub != cover && sub.layer) [walk addObject:sub.layer];
+        while (walk.count && engineLayers.count < 24) {
+          CALayer *layer = walk.firstObject;
+          [walk removeObjectAtIndex:0];
+          if (!CGRectIsEmpty(layer.bounds) && !layer.hidden) [engineLayers addObject:@{@"class" : NSStringFromClass(layer.class), @"frame" : placed(layer)}];
+          [walk addObjectsFromArray:layer.sublayers ?: @[]];
+        }
         [shown addObject:@{
           @"frame" : @[ @(NSMinX(r)), @(content.isFlipped ? NSMinY(r) : content.bounds.size.height - NSMaxY(r)), @(NSWidth(r)), @(NSHeight(r)) ],
           @"picture" : picture ? @[ @(CGImageGetWidth(picture)), @(CGImageGetHeight(picture)) ] : @[],
+          @"placed" : root ? placed(cover.superview.layer) : @[],
+          @"engineLayers" : root ? engineLayers : @[],
         }];
       }
       NSData *json = [NSJSONSerialization dataWithJSONObject:shown options:0 error:nil];

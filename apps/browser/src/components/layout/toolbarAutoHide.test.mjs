@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 const { useBrowser } = await import("../../store/browser.ts");
-const { noteScroll, revealToolbar, setToolbarPeek, toolbarMode, useToolbarAutoHide } = await import("./toolbarAutoHide.ts");
+const { documentKey, noteDocument, noteScroll, revealToolbar, setToolbarPeek, toolbarMode, useToolbarAutoHide } = await import("./toolbarAutoHide.ts");
 
 const script = readFileSync(new URL("../../../../../packages/ardiacore/ios/page_script.js", import.meta.url), "utf8");
 const source = script.match(/const scrollDirection = (\(\) => \{[\s\S]*?\n {2}\});\n/)?.[1];
@@ -69,6 +69,7 @@ function loadPage(tabId, { scrollY = 0 } = {}) {
   const listeners = {};
   const frames = [];
   const observers = [];
+  const mutations = [];
   let now = 1000;
   const doc = { scrollTop: scrollY, scrollHeight: 4800, clientHeight: 800, clientWidth: 1200, contains: () => true };
   const env = {
@@ -94,6 +95,19 @@ function loadPage(tabId, { scrollY = 0 } = {}) {
         this.watched.clear();
       }
     },
+    MutationObserver: class {
+      constructor(fn) {
+        this.fn = fn;
+        this.watching = false;
+        mutations.push(this);
+      }
+      observe() {
+        this.watching = true;
+      }
+      disconnect() {
+        this.watching = false;
+      }
+    },
   };
   install(env);
   const fire = (type, e) => (listeners[type] ?? []).forEach((fn) => fn({ type, ...e }));
@@ -116,9 +130,10 @@ function loadPage(tabId, { scrollY = 0 } = {}) {
     return el;
   };
   const resized = () => observers.forEach((o) => o.watched.size && o.fn([]));
+  const mutated = () => mutations.forEach((o) => o.watching && o.fn([]));
   const nextFrame = () => frames.splice(0).forEach((fn) => fn());
   const tick = (ms) => (now += ms);
-  return { doc, document: env.document, fire, scroll, overlay, resized, nextFrame, tick };
+  return { doc, document: env.document, fire, scroll, overlay, resized, mutated, nextFrame, tick };
 }
 
 function hiddenTab() {
@@ -188,6 +203,37 @@ test("an overlay closed without changing size (hidden, transparent, slid out) gi
     assert.ok(!hidden(tabId));
     useBrowser.getState().closeTab(tabId);
   }
+});
+
+test("an overlay the app hides later, with no input or transition, gives the bar back at the page's top", () => {
+  const tabId = hiddenTab();
+  const page = loadPage(tabId);
+  const dialog = page.overlay();
+  page.scroll(dialog, 1500);
+  assert.ok(hidden(tabId));
+  page.fire("click", { target: { parent: dialog } });
+  page.nextFrame();
+  assert.ok(hidden(tabId));
+  dialog.visible = false;
+  page.mutated();
+  page.nextFrame();
+  assert.ok(!hidden(tabId));
+  useBrowser.getState().closeTab(tabId);
+});
+
+test("an address change within a document keeps its page size; a new document starts over", () => {
+  const tabId = hiddenTab();
+  const key = (url) => documentKey(url, useToolbarAutoHide.getState().documents[tabId]);
+  assert.notEqual(key("https://app.test/?view=invoices"), key("https://app.test/?view=taxes"));
+  noteDocument(tabId);
+  const first = key("https://app.test/?view=invoices");
+  assert.equal(key("https://app.test/?view=taxes&year=2026"), first);
+  assert.equal(key("https://app.test/?view=taxes#top"), first);
+  assert.notEqual(key("chrome-error://chromewebdata/"), first);
+  noteDocument(tabId);
+  assert.notEqual(key("https://app.test/?view=invoices"), first);
+  useBrowser.getState().closeTab(tabId);
+  assert.equal(useToolbarAutoHide.getState().documents[tabId], undefined);
 });
 
 test("two full-window scrollers moving together (synced panes) still hide and show the bar", () => {
