@@ -114,7 +114,8 @@ function loadPage(tabId, { scrollY = 0 } = {}) {
     return el;
   };
   const resized = () => observers.forEach((o) => o.watched.size && o.fn([]));
-  return { doc, fire, scroll, overlay, resized };
+  const nextFrame = () => frames.splice(0).forEach((fn) => fn());
+  return { doc, document: env.document, fire, scroll, overlay, resized, nextFrame };
 }
 
 function hiddenTab() {
@@ -161,6 +162,20 @@ test("wheeling up or pressing Home at the page's top shows the bar, not inside a
   page.fire("keydown", { key: "ArrowDown" });
   assert.ok(hidden(tabId));
   page.fire("keydown", { key: "Home" });
+  assert.ok(!hidden(tabId));
+  useBrowser.getState().closeTab(tabId);
+});
+
+test("the page jumping to its top shows the bar when a small scroller moves in the same frame", () => {
+  const tabId = hiddenTab();
+  const page = loadPage(tabId);
+  page.scroll(page.doc, 1500);
+  assert.ok(hidden(tabId));
+  const nav = { scrollTop: 30, scrollHeight: 400, clientHeight: 220, clientWidth: 200 };
+  page.doc.scrollTop = 0;
+  page.fire("scroll", { target: page.document });
+  page.fire("scroll", { target: nav });
+  page.nextFrame();
   assert.ok(!hidden(tabId));
   useBrowser.getState().closeTab(tabId);
 });
