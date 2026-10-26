@@ -603,7 +603,6 @@ public class ShellModule: Module {
       } else if let hex = item["swatch"] as? String, let light = NSColor(hex: hex) {
         let dark = (item["swatchDark"] as? String).flatMap { NSColor(hex: $0) } ?? light
         entry.image = swatch(NSColor(name: nil) { $0.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? dark : light })
-        if #available(macOS 27.0, *) { entry.preferredImageVisibility = .visible }
       }
       menu.addItem(entry)
     }
