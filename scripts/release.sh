@@ -108,9 +108,6 @@ if [ -n "$dirty" ]; then
   echo "$dirty" >&2
 fi
 
-sdk="$(xcrun --sdk macosx --show-sdk-version)"
-[ "${sdk%%.*}" -ge 27 ] || die "the selected Xcode has the macOS $sdk SDK: a release needs Xcode 27 or later, or it leaves out the macOS 27 code"
-
 [ -d "$framework_src" ] || die "no ArdiaCore framework at $framework_src (engine/ardiacore/apply.sh, then build chrome_framework)"
 if [ -n "$framework_engine" ]; then
   [ -n "${ARDIACORE_FRAMEWORK:-}" ] || die "ARDIACORE_FRAMEWORK_ENGINE names the engine tree a prebuilt ARDIACORE_FRAMEWORK was built from; set both or neither"

@@ -83,8 +83,6 @@ stays up. That's GPL-3.0 §6(d) for the GPL parts (uBlock Origin today), and it'
 
 ## Once per machine
 
-- **Xcode 27 or later** (the macOS 27 SDK), selected with `xcode-select`. Older Xcodes build without the macOS 27
-  code, so release.sh refuses them.
 - The **Developer ID Application: mantra patel (U5L5T3NGVV)** identity in the login keychain, and Xcode
   signed in to the team: the export fetches the Developer ID provisioning profile
   (`-allowProvisioningUpdates`) that the keychain-group entitlements need.
@@ -120,7 +118,7 @@ stays up. That's GPL-3.0 §6(d) for the GPL parts (uBlock Origin today), and it'
    `headline`, if the tree under `apps/browser`, `packages`, `engine` or `scripts/dmg` has uncommitted changes, or if the engine
    framework is older than the tree's ArdiaCore sources or the Chromium tree differs from `engine/ardiacore`
    (`apply.sh --check`), if the version doesn't fit the channel or the notes' `channel`, if it can't read the published
-   appcast, or if the build number isn't above every build in it, or if the selected Xcode's macOS SDK is older than 27. It writes `dist/<version>/`:
+   appcast, or if the build number isn't above every build in it. It writes `dist/<version>/`:
    - archives the Release configuration of `apps/browser/macos` (arm64 only), staging the engine into its own
      derived data so a development build restaging can't change it mid-build, and exports it with Developer ID,
    - leaves out what Ardia never loads (`packages/ardiacore/scripts/prune-bundle.sh`, after `strip-engine.sh`): Chrome's
