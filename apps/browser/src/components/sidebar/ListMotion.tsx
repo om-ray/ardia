@@ -8,7 +8,7 @@ import { useAnimatedStyle, type ClipSource, type EntryMotion } from "./EntryMoti
 import { groupEntries } from "../../state/sidebar/entries";
 import { entryHeight } from "../../state/sidebar/geometry";
 import { ghostEntry, snapshotEntry, type EntrySnapshot } from "./GhostEntry";
-import { curve } from "../ui/motion";
+import { curve, movedToNative } from "../ui/motion";
 import { SIDEBAR_MOTION } from "./tokens";
 
 export const SLIDE_MS = SIDEBAR_MOTION.listSlide;
@@ -211,7 +211,10 @@ function useMotion({ devKey, entries, from, planner, height, enabled, nativeTail
   if (ghosts.current.some((g) => g.until && now >= g.until)) ghosts.current = ghosts.current.filter((g) => !g.until || now < g.until);
 
   const prepare = (plan: Plan, at: number) => {
-    for (const m of plan.moves) if (!slides.has(m.key)) slides.set(m.key, { value: new Animated.Value(m.from), from: m.from, at, until: 0, landed: false });
+    for (const m of plan.moves) {
+      const known = slides.get(m.key);
+      if (!known || (m.key === TAIL && !nativeTail && movedToNative(known.value))) slides.set(m.key, { value: new Animated.Value(m.from), from: m.from, at, until: 0, landed: false });
+    }
     ghosts.current = [...ghosts.current, ...plan.ghosts];
     clipped.clear();
     for (const key of plan.clipped) clipped.add(key);
@@ -258,9 +261,9 @@ function useMotion({ devKey, entries, from, planner, height, enabled, nativeTail
       slide.at = at;
       slide.until = at + slideMs + FRAME_SLACK_MS;
       slide.landed = false;
-      const timing = Animated.timing(slide.value, { toValue: 0, duration: slideMs, easing: SLIDE_EASING, useNativeDriver: nativeTail || m.key !== TAIL });
+      const native = nativeTail || m.key !== TAIL;
       const clips = i === 0 && token;
-      timing.start(({ finished }) => {
+      const landed = ({ finished }: { finished: boolean }) => {
         if (!finished) return;
         slide.landed = true;
         if (!clips) return;
@@ -270,7 +273,13 @@ function useMotion({ devKey, entries, from, planner, height, enabled, nativeTail
           clipped.clear();
           announce();
         });
-      });
+      };
+      if (!native && movedToNative(slide.value)) {
+        slide.value.setValue(0);
+        landed({ finished: true });
+        continue;
+      }
+      Animated.timing(slide.value, { toValue: 0, duration: slideMs, easing: SLIDE_EASING, useNativeDriver: native }).start(landed);
     }
     for (const g of plan.ghosts) {
       g.until = at + FADE_MS * devScale() + FRAME_SLACK_MS;

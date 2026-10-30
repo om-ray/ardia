@@ -1,6 +1,6 @@
-import { useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Animated, View } from "react-native";
-import { curve } from "../ui/motion";
+import { curve, movedToNative } from "../ui/motion";
 import { FoldedAway } from "../../state/sidebar/hover";
 import { SIDEBAR_MOTION } from "./tokens";
 
@@ -10,7 +10,7 @@ const FOLD_EASING = curve.fold;
 type FoldState = { open: Animated.Value; moving: boolean };
 
 export function useFold(collapsed: boolean): FoldState {
-  const open = useRef(new Animated.Value(collapsed ? 0 : 1)).current;
+  const [open, setOpen] = useState(() => new Animated.Value(collapsed ? 0 : 1));
   const [settled, setSettled] = useState(collapsed);
   const [running, setRunning] = useState(false);
   const mounted = useRef(false);
@@ -20,7 +20,12 @@ export function useFold(collapsed: boolean): FoldState {
       return;
     }
     setRunning(true);
-    const animation = Animated.timing(open, { toValue: collapsed ? 0 : 1, duration: FOLD_MS, easing: FOLD_EASING, useNativeDriver: false });
+    let value = open;
+    if (movedToNative(open)) {
+      value = new Animated.Value(collapsed ? 1 : 0);
+      setOpen(value);
+    }
+    const animation = Animated.timing(value, { toValue: collapsed ? 0 : 1, duration: FOLD_MS, easing: FOLD_EASING, useNativeDriver: false });
     animation.start(({ finished }) => {
       if (!finished) return;
       setSettled(collapsed);
@@ -62,7 +67,7 @@ export function Fold({
   const parentAway = useContext(FoldedAway);
   const measuring = rowHeight === undefined;
   const [measured, setMeasured] = useState<Record<string, number>>({});
-  const styles = useRef(new Map<number, object>()).current;
+  const styles = useMemo(() => new Map<number, object>(), [open]);
   const kept = keep && entries.some((e) => e.key === keep) ? keep : null;
   const folding = !!kept && (collapsed || moving);
   const state = useRef({ moving, folding, kept });

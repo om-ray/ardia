@@ -1,4 +1,9 @@
-import { Easing } from "react-native";
+import { Animated, Easing } from "react-native";
+
+// React Native moves a value to the native driver once any native-driven node shares a view's animated props
+// with it, and a JS-driven animation on it is then a fatal error. A layout-prop animation (height, margin)
+// can't run natively, so its owner checks this and goes on with a fresh value or a jump instead.
+export const movedToNative = (value: Animated.Value) => (value as unknown as { __isNative?: boolean }).__isNative === true;
 
 export const curve = {
   linear: Easing.linear,
